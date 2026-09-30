@@ -1,0 +1,66 @@
+# Standard OWASP bug classes that the p/default pack does not cover, found as
+# gaps when benchmarking against OWASP Juice Shop. Generic rules, not tuned to
+# any single project. Loaded in both online and offline modes.
+rules:
+  - id: angular-bypass-security-trust
+    languages: [typescript]
+    severity: WARNING
+    message: >-
+      Angular sanitization is disabled for this value. If any part of it comes
+      from user input, a URL, or an API response, this is cross-site scripting.
+    patterns:
+      - pattern-either:
+          - pattern: $SAN.bypassSecurityTrustHtml($X)
+          - pattern: $SAN.bypassSecurityTrustScript($X)
+          - pattern: $SAN.bypassSecurityTrustStyle($X)
+          - pattern: $SAN.bypassSecurityTrustUrl($X)
+          - pattern: $SAN.bypassSecurityTrustResourceUrl($X)
+      # A constant string is developer-controlled, not injectable.
+      - pattern-not: $SAN.$METHOD("...")
+    metadata:
+      cwe: ["CWE-79: Improper Neutralization of Input During Web Page Generation"]
+      category: security
+
+  - id: nosql-where-injection
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      A MongoDB $where clause is built from a non-constant string. $where runs
+      JavaScript on the database server, so user input here is NoSQL/code injection.
+    paths:
+      include: ["*.js", "*.mjs", "*.cjs", "*.ts"]
+    pattern-regex: "\\$where['\"]?\\s*:\\s*(?!['\"][^'\"\\n]*['\"]\\s*[,}])[^\\s,}]"
+    metadata:
+      cwe: ["CWE-943: Improper Neutralization of Special Elements in Data Query Logic"]
+      category: security
+
+  # MD5/SHA-1 for file checksums or IDs is common and harmless, so this only
+  # fires inside functions whose names suggest passwords, tokens or auth.
+  - id: weak-hash-algorithm
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      MD5 or SHA-1 is used in what looks like password, token or auth code. Both
+      are broken for security; use bcrypt/scrypt/argon2 for passwords, SHA-256+
+      or HMAC for tokens.
+    patterns:
+      - pattern-either:
+          - pattern: $CRYPTO.createHash("md5")
+          - pattern: $CRYPTO.createHash("sha1")
+          - pattern: $CRYPTO.createHash("MD5")
+          - pattern: $CRYPTO.createHash("SHA1")
+      - pattern-either:
+          - pattern-inside: |
+              const $NAME = (...) => ...
+          - pattern-inside: |
+              let $NAME = (...) => ...
+          - pattern-inside: |
+              function $NAME(...) { ... }
+          - pattern-inside: |
+              $NAME(...) { ... }
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i).*(hash|passw|pwd|secret|token|credential|auth|login).*
+    metadata:
+      cwe: ["CWE-327: Use of a Broken or Risky Cryptographic Algorithm"]
+      category: security

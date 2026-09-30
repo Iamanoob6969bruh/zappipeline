@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.ssp/
+.env
+.env.*
+!.env.example
+*.sqlite3*
+# Semgrep p/default pack: fetched locally by fetch_rules.py, not redistributed
+rules/p-default.yml
+
+# Generated report artifacts and local scans
+*.report.json
+scan-*.json
+assessment-*.md
+assessment-*.html
+report.json

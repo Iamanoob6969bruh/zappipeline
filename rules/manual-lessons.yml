@@ -1,0 +1,42 @@
+# Bug classes found by manual review, encoded as rules so they are caught
+# automatically on every future scan. Each rule targets a class of bug, not a
+# single line. Loaded in both online and offline modes.
+rules:
+  - id: csp-static-nonce
+    languages: [generic]
+    severity: WARNING
+    message: >-
+      Content-Security-Policy uses a hard-coded nonce. A nonce must be random for
+      every response; a fixed nonce is public and lets any injected script tag run.
+    paths:
+      include: ["*.json", "*.conf", "*.conf.template", "*.ts", "*.js", "*.mjs"]
+    pattern-regex: "script-src[^;\"\\n]*'nonce-[A-Za-z0-9+/=_-]{3,}'"
+    metadata:
+      cwe: ["CWE-1270: Generation of Incorrect Security Tokens"]
+      category: security
+
+  - id: nginx-injects-internal-credential
+    languages: [generic]
+    severity: WARNING
+    message: >-
+      nginx adds an internal credential to every proxied request, so any client
+      that can reach this location passes the upstream's authentication check.
+    paths:
+      include: ["*.conf", "*.conf.template"]
+    pattern-regex: "proxy_set_header\\s+\\S*(?i:token|secret|api-key|authorization)\\S*\\s+\"?\\$\\{?[A-Z0-9_]*(?:TOKEN|SECRET|KEY|PASSWORD)"
+    metadata:
+      cwe: ["CWE-288: Authentication Bypass Using an Alternate Path or Channel"]
+      category: security
+
+  - id: xml-feed-unescaped-interpolation
+    languages: [generic]
+    severity: WARNING
+    message: >-
+      A value is interpolated into an XML/RSS element without escaping. Scraped or
+      upstream text containing '<' or '&' can inject markup or break the feed.
+    paths:
+      include: ["*.js", "*.mjs", "*.ts"]
+    pattern-regex: "<(link|guid|loc|url|id)>\\$\\{(?!\\s*(?:esc|escape|cdata|encode))[^}]+\\}</\\1>"
+    metadata:
+      cwe: ["CWE-91: XML Injection"]
+      category: security

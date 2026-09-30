@@ -1,0 +1,24 @@
+# Small bundled offline ruleset, not a replacement for the Semgrep registry.
+rules:
+  - id: js-dynamic-eval
+    languages: [javascript, typescript]
+    message: Dynamic eval may execute untrusted input. Trace the value before deciding exploitability.
+    severity: ERROR
+    patterns:
+      - pattern: eval($INPUT)
+      - pattern-not: eval("...")
+  - id: js-document-write
+    languages: [javascript, typescript]
+    message: document.write can introduce script injection if its input is untrusted.
+    severity: WARNING
+    pattern: document.write(...)
+  - id: js-dynamic-function
+    languages: [javascript, typescript]
+    message: Function construction can execute untrusted text as code.
+    severity: WARNING
+    pattern: new Function(...)
+  - id: js-child-process-exec
+    languages: [javascript, typescript]
+    message: Shell command execution needs review for untrusted input.
+    severity: ERROR
+    pattern: child_process.exec(...)

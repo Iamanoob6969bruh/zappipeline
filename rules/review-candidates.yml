@@ -1,0 +1,17 @@
+# Opt-in, high-recall rules: they find real bugs but also many safe cases, so
+# they are not loaded by default. Use for a manual review pass:
+#   cli.py --src <dir> --semgrep-config rules/review-candidates.yml
+rules:
+  - id: html-template-unescaped-string-field
+    languages: [generic]
+    severity: INFO
+    message: >-
+      A string-looking field is interpolated into an HTML template without
+      escapeHtml. If the value can come from an upstream feed or user input, this
+      is HTML injection. Review the data source.
+    paths:
+      include: ["src/**/*.ts", "src/**/*.tsx"]
+    pattern-regex: "<(td|th|span|div|li|p|a|strong|small|h[1-6])[^>`]*>\\$\\{(?!\\s*(?:esc|escape|sanitize|t\\(|safe|format|fmt|Math\\.|String\\(|Number\\(|\\d))[a-zA-Z_.]*(?:Date|date|name|Name|title|Title|label|Label|text|Text|desc|Description|status|Status|source|Source)\\}</\\1>"
+    metadata:
+      cwe: ["CWE-79: Improper Neutralization of Input During Web Page Generation"]
+      category: security
