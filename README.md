@@ -24,6 +24,83 @@ automatically or by a person. Metrics always come from the current scan.
 - **Human in the loop.** AI advice is optional and only suggests; every GitHub
   action needs explicit approval.
 
+## Quick start
+
+Tested on Linux with Python 3.12 and 3.14. macOS should work the same way. On Windows, use
+WSL2 as described below; running natively on Windows is not tested.
+
+You need: **Python 3.11 or newer**, **git**, **Gitleaks** and **Trivy**, plus
+**Docker** if you also want to scan the running app with OWASP ZAP.
+
+### Linux and macOS
+
+```bash
+# 1. Get the code
+git clone https://github.com/Iamanoob6969bruh/zappipeline.git
+cd zappipeline
+
+# 2. Python environment (Semgrep installs into it)
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt semgrep
+
+# 3. Scanners: pick your system
+sudo pacman -S gitleaks trivy docker     # Arch / CachyOS / Manjaro
+brew install gitleaks trivy              # macOS (install Docker Desktop separately)
+# Ubuntu / Debian: see the Gitleaks and Trivy install links below
+
+# 4. One-time downloads, so later scans work offline
+.venv/bin/python fetch_rules.py                  # Semgrep rule pack
+trivy image --download-db-only                   # Trivy vulnerability database
+docker pull ghcr.io/zaproxy/zaproxy:stable       # ZAP image (about 3.7 GB, optional)
+
+# 5. Check the setup: exit code 0 means every scanner ran
+.venv/bin/python cli.py --src target-app --json scan-check.json
+```
+
+Install links: [Gitleaks](https://github.com/gitleaks/gitleaks#installing),
+[Trivy](https://github.com/aquasecurity/trivy#get-trivy),
+[Docker](https://docs.docker.com/get-docker/).
+
+### Windows (WSL2)
+
+1. Open PowerShell as administrator, run `wsl --install`, and restart. This
+   installs Ubuntu. Use Ubuntu 24.04 or newer (older versions ship Python 3.10, which is too old).
+2. Open **Ubuntu** from the Start menu and install the basics:
+   `sudo apt update && sudo apt install -y git python3-venv`
+3. Install Gitleaks and Trivy inside Ubuntu (links above).
+4. For ZAP, install Docker Desktop with **WSL integration** turned on for Ubuntu.
+   ZAP uses Docker host networking, so also turn on **Settings → Resources →
+   Network → Enable host networking** (Docker Desktop 4.34 or newer). Without it,
+   skip `--url` and run the static scanners only.
+5. Follow the Linux steps above inside Ubuntu. Keep the project and the app you
+   are testing inside the Ubuntu home folder (`~/…`); `/mnt/c/…` works but is slow.
+
+Pages served inside WSL open in your normal Windows browser at the same
+`http://127.0.0.1:…` address.
+
+### Scan an app
+
+Start the app you are testing so it listens on localhost, then use either:
+
+**Dashboard.** Run the command below, open **http://127.0.0.1:8501**, enter the
+app's source folder and its localhost URL, and click **Run pipeline**. The reports
+download as JSON, Markdown or HTML.
+
+```bash
+.venv/bin/python -m streamlit run app.py --server.address 127.0.0.1
+```
+
+**Command line.** Scans the source and the running app and writes a report:
+
+```bash
+.venv/bin/python cli.py --src /path/to/app --url http://localhost:3000 \
+  --json scan-app.json --report assessment-app.html
+```
+
+Leave out `--url` for a static scan only (no Docker needed). Any URL that is not
+localhost is refused. Scans take a few minutes on a large project. Output names
+starting with `scan-` or `assessment-` are gitignored.
+
 ## Architecture
 
 ```text
@@ -60,7 +137,7 @@ Offline flags are not an operating-system network sandbox.
 
 ## Install
 
-Python 3.11+ on Linux is the supported execution environment. ZAP currently uses
+The details behind the quick start. Linux is the tested environment. ZAP uses
 Docker host networking to reach the local test application and scope proxy.
 
 ```bash
@@ -71,12 +148,13 @@ uv pip install --python .venv/bin/python -r requirements-dev.txt
 ```
 
 Install scanner executables separately: Semgrep (`pip install semgrep` in this
-venv), Gitleaks, Trivy and Docker. Executables placed in `.venv/bin/` are found even
-when the venv is not activated. Preload the offline data once while online:
+venv), Gitleaks, Trivy and Docker. Executables on your PATH or placed next to the
+venv's Python (`.venv/bin/`, or `.venv\Scripts\` on Windows) are found even when
+the venv is not activated. Preload the offline data once while online:
 
 ```bash
 .venv/bin/python fetch_rules.py            # Semgrep p/default pack -> rules/p-default.yml
-.venv/bin/trivy image --download-db-only   # Trivy vulnerability database
+trivy image --download-db-only             # Trivy vulnerability database
 docker pull ghcr.io/zaproxy/zaproxy:stable # ZAP image (about 3.7 GB)
 ```
 

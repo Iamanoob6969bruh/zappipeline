@@ -25,8 +25,25 @@ ZAP_SCOPE_ABORT = 43  # our scope hook's fail-closed exit; never confused with 3
 
 
 def _which(binary: str) -> str | None:
-    candidate = Path(sys.executable).parent / binary
-    return shutil.which(binary) or (str(candidate) if candidate.is_file() else None)
+    found = shutil.which(binary)
+    if found:
+        return found
+    # Tools placed next to the venv's Python (bin/ on Linux/macOS, Scripts\ on Windows).
+    for name in (binary, binary + ".exe"):
+        candidate = Path(sys.executable).parent / name
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+def _kill_tree(proc: asyncio.subprocess.Process) -> None:
+    try:
+        if hasattr(os, "killpg"):
+            os.killpg(proc.pid, signal.SIGKILL)  # the whole process group (POSIX)
+        else:
+            proc.kill()  # Windows has no process groups here
+    except ProcessLookupError:
+        pass
 
 
 async def _exec(
@@ -61,10 +78,7 @@ async def _exec(
             code = 124
         finally:
             if proc.returncode is None:
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
+                _kill_tree(proc)
                 await proc.wait()
             await waiter
         if os.fstat(out.fileno()).st_size + os.fstat(err.fileno()).st_size > MAX_OUTPUT:
@@ -440,8 +454,8 @@ def zap_started(zap, target):
             name,
             "--network",
             "host",
-            "--user",
-            f"{os.getuid()}:{os.getgid()}",
+            # Run as the invoking user where the OS has one (not on Windows).
+            *(["--user", f"{os.getuid()}:{os.getgid()}"] if hasattr(os, "getuid") else []),
             "--workdir",
             "/zap/wrk",
             "--pull=never" if offline else "--pull=missing",
