@@ -2,8 +2,9 @@
 
 A local security review workbench for SIH PS-163 / World Monitor. It coordinates
 Semgrep, Gitleaks, Trivy and OWASP ZAP, applies explainable JS/TS triage, and offers
-optional AI advice and explicitly approved GitHub drafts. A finding is a lead,
-not a proven vulnerability. Metrics always come from the current scan.
+optional AI advice and explicitly approved GitHub drafts. Reports follow the SIH
+PS-163 template with CVSS 3.1 scores. A finding is a lead until it is confirmed,
+automatically or by a person. Metrics always come from the current scan.
 
 ![Pipeline overview](docs/pipeline-diagram-landscape.png)
 
@@ -15,7 +16,8 @@ not a proven vulnerability. Metrics always come from the current scan.
   302 actionable leads (about 67%), each dropped alert with a written reason.
 - **Manual findings become rules.** World Monitor's static CSP nonce
   (`nonce-wm-static-bootstrap`, the same value on every response) is now caught
-  automatically by the `csp-static-nonce` rule. Evidence:
+  automatically by the `csp-static-nonce` rule, and confirmed against the running
+  app with two read-only requests. Evidence:
   [docs/static-nonce-evidence.png](docs/static-nonce-evidence.png).
 - **Generalises.** On OWASP Juice Shop, an app it was not built for, it found 11
   of 14 known vulnerabilities blind.
@@ -39,6 +41,10 @@ CLI / Streamlit / FastAPI
           |
  Tier 2 (optional): offline estimates OR explicitly enabled external AI advice
           |
+ curated CVSS vectors + read-only verification on the loopback URL (evidence.py)
+          |
+ assessment report: PS-163 fields, scope coverage, testing constraints
+          |
  optional GitHub issue matching → analyst reviews exact proposal
           |
  preview → approval bound to content and base revision → isolated draft PR
@@ -49,7 +55,8 @@ Semgrep uses a local copy of the `p/default` pack (see `fetch_rules.py`) plus th
 bundled rules, Trivy requires cached databases/checks, and Docker will not pull a
 missing ZAP image. Online mode uses the `p/default` registry pack (Semgrep refuses
 `--config auto` while metrics are off). External downloads, registry rules, GitHub
-and AI require online mode. Offline flags are not an operating-system network sandbox.
+and AI require online mode. Verification only contacts the approved loopback URL.
+Offline flags are not an operating-system network sandbox.
 
 ## Install
 
