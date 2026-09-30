@@ -41,6 +41,8 @@ class SecurityFinding(BaseModel):
     filter_reason: str | None = None
     filtered_by: Literal["tier1", "tier2"] | None = None
     cvss_score: float | None = Field(default=None, ge=0, le=10)
+    cvss_vector: str | None = None
+    cvss_source: str | None = None
     poc_command: str | None = None
     suggested_patch: str | None = None
     confidence_score: float | None = Field(default=None, ge=0, le=1)
@@ -50,6 +52,7 @@ class SecurityFinding(BaseModel):
     github_issue_id: int | None = None
     github_issue_url: str | None = None
     known_source: str | None = None
+    verification: str | None = None
     status: Status = "NEW"
 
     def model_post_init(self, _ctx) -> None:

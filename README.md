@@ -182,17 +182,38 @@ is not automatically loaded. Never commit real credentials.
 ## Assessment reports
 
 `assessment_report.py` turns any scan into a report in the SIH PS-163 template:
-title, description, affected components, severity with a CVSS estimate, OWASP
+title, description, affected components, severity with a CVSS 3.1 score, OWASP
 Top 10 category, steps to reproduce, proof of concept, business impact and
 remediation. Findings sharing a rule and severity are grouped, so a scan with
-hundreds of alerts reads as a few dozen sections. The report also lists scanner
-coverage and what was filtered and why.
+hundreds of alerts reads as a few dozen sections. The report also includes:
+
+- **Confirmed findings** first, with the evidence collected automatically.
+- **Testing constraints**: what was and was not sent to the target.
+- **Coverage of the PS-163 scope**: each finding group mapped to a scope area
+  (authentication, access control, input handling, API, client-side controls,
+  secure communication, data storage), with areas that had no automated findings
+  marked for manual testing.
+- Scanner coverage, and what was filtered and why.
+
+Every CVSS score states where it came from:
+
+| Source | Used for |
+|---|---|
+| Published advisory (NVD, then GHSA) | Dependency CVEs reported by Trivy, with the vector |
+| Curated rule vector (`evidence.py`) | Bug classes our own rules target, with the vector and rationale |
+| Estimate from scanner severity | Everything else; marked as an estimate to confirm with a calculator |
+
+`cvss.py` computes base scores from vectors using the FIRST CVSS 3.1 formula.
+
+Automatic verification (`evidence.py`) is read-only. When a localhost URL is given,
+a static-nonce finding is checked by sending two GET requests, pinned to the IP the
+scope guard approved, and comparing the Content-Security-Policy nonces. Only a
+finding reproduced this way is marked CONFIRMED; everything else stays a lead.
+Other proofs of concept are read-only commands that the tool displays but never runs.
 
 Available as Markdown or standalone HTML from the CLI (`--report`), from a saved
 scan (`assessment_report.py scan.json out.md`), and as downloads in the dashboard.
-HTML escapes every value and all output is redacted again before writing. Nothing
-is labelled confirmed: a report entry is a lead until a person reproduces it, and
-the proof of concept is only a read-only probe the tool never executes.
+HTML escapes every value and all output is redacted again before writing.
 
 ## Rules from manual review
 
@@ -280,6 +301,7 @@ caches and diagnostics are outside this report redaction boundary.
 | `github_sync.py` | Known issue matching, strict patch previews, approved drafts |
 | `pipeline.py` | Shared orchestration for all interfaces |
 | `assessment_report.py` | SIH-template assessment reports (Markdown/HTML) |
+| `evidence.py`, `cvss.py` | Curated CVSS vectors, read-only verification, CVSS 3.1 scoring |
 | `main.py`, `cli.py`, `app.py` | API, terminal and analyst dashboard |
 | `rules/baseline.yml` | Small bundled Semgrep ruleset |
 | `rules/manual-lessons.yml` | Bug classes from manual review, run on every scan |

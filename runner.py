@@ -118,6 +118,17 @@ def parse_gitleaks(data: list) -> list[SecurityFinding]:
     ]
 
 
+def _trivy_cvss(item: dict) -> tuple[float | None, str | None, str | None]:
+    """Published CVSS 3.x base score and vector, preferring NVD, then GHSA."""
+    sources = item.get("CVSS") or {}
+    for name in ("nvd", "ghsa", "redhat", *sources):
+        entry = sources.get(name) or {}
+        score, vector = entry.get("V3Score"), entry.get("V3Vector")
+        if isinstance(score, (int, float)) and 0 <= score <= 10:
+            return float(score), vector if isinstance(vector, str) else None, name.upper()
+    return None, None, None
+
+
 def parse_trivy(data: dict) -> list[SecurityFinding]:
     findings = []
     for result in data.get("Results", []) or []:
@@ -128,6 +139,22 @@ def parse_trivy(data: dict) -> list[SecurityFinding]:
                 if item.get("PkgName"):
                     rule += ":" + item["PkgName"]
                 level = item.get("Severity", "INFO").upper()
+                description = item.get("Title") or item.get("Description") or rule
+                if group == "Secrets":
+                    snippet = "[REDACTED_SECRET_EVIDENCE]"
+                elif group == "Misconfigurations":
+                    snippet = item.get("Message") or None
+                    if item.get("Resolution"):
+                        description += f". Fix: {item['Resolution']}"
+                else:
+                    snippet = (
+                        f"{item.get('PkgName', '')} {item.get('InstalledVersion', '')}; "
+                        f"fixed: {item.get('FixedVersion') or 'no fixed version yet'}"
+                    )
+                score, vector, source = (
+                    _trivy_cvss(item) if group == "Vulnerabilities" else (None,) * 3
+                )
+                line = item.get("StartLine") or (item.get("CauseMetadata") or {}).get("StartLine")
                 findings.append(
                     SecurityFinding(
                         tool_name="Trivy",
@@ -136,13 +163,12 @@ def parse_trivy(data: dict) -> list[SecurityFinding]:
                         if level in {"CRITICAL", "HIGH", "MEDIUM", "LOW"}
                         else "INFO",
                         file_path=result.get("Target"),
-                        line_number=item.get("StartLine") or None,
-                        raw_description=item.get("Title") or item.get("Description") or rule,
-                        code_snippet=(
-                            "[REDACTED_SECRET_EVIDENCE]"
-                            if group == "Secrets"
-                            else f"{item.get('PkgName', '')} {item.get('InstalledVersion', '')}; fixed: {item.get('FixedVersion', 'unknown')}"
-                        ),
+                        line_number=line or None,
+                        raw_description=description,
+                        code_snippet=snippet,
+                        cvss_score=score,
+                        cvss_vector=vector,
+                        cvss_source=f"published advisory ({source})" if source else None,
                     )
                 )
     return findings

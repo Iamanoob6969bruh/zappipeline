@@ -28,12 +28,13 @@ def test_markdown_has_every_sih_template_field():
     for field in (
         "SQL injection",
         "**Severity:** HIGH",
-        "**CVSS (estimate):** 7.4",
+        "**CVSS 3.1:** 7.4 HIGH",
+        "**Scope area:** Input validation and data handling",
         "**Description.**",
         "**Affected components:**",
         "`src/a.ts:1`",
         "**Steps to reproduce:**",
-        "**Proof of concept:**",
+        "**Proof of concept.**",
         "**Business impact.**",
         "**Remediation.**",
     ):
@@ -70,7 +71,9 @@ def test_groups_split_by_severity_and_skip_filtered():
     ("tool", "rule", "expected"),
     [
         ("Trivy", "CVE-2025-1234:lodash", "Vulnerable dependency"),
-        ("Trivy", "DS-0002", "Infrastructure or container misconfiguration"),
+        ("Trivy", "DS-0002", "Container runs as root"),
+        ("Trivy", "DS-0026", "Container has no health check"),
+        ("Semgrep", "wildcard-postmessage-configuration", "Unrestricted postMessage"),
         ("Semgrep", "xml-feed-unescaped-interpolation", "XML injection"),
         ("Semgrep", "csp-static-nonce", "Static CSP nonce"),
         ("Semgrep", "nosql-where-injection", "NoSQL / database code injection"),

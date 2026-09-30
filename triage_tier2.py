@@ -99,7 +99,14 @@ def ai_triage_finding(
             result.reasoning = "AI request failed or returned invalid output. " + result.reasoning
     elif allow_llm:
         result.reasoning = "AI provider is not configured. " + result.reasoning
-    finding.cvss_score = result.cvss_score
+    # A published advisory or curated rule vector outranks any estimate.
+    if not (finding.cvss_source or "").startswith(("published", "curated")):
+        finding.cvss_score = result.cvss_score
+        finding.cvss_source = (
+            "AI estimate, unvalidated"
+            if finding.advisory_mode == "llm"
+            else "estimate from scanner severity"
+        )
     finding.confidence_score = result.confidence_score
     finding.advisory_reasoning = redact_secrets(result.reasoning)
     finding.advisory_false_positive = result.is_false_positive

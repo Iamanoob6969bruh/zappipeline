@@ -4,6 +4,7 @@ import asyncio
 
 import github_sync
 import history
+from evidence import run_verification
 from models import ScanOptions, ScanReport
 from redaction import redact_data
 from runner import run_scanners
@@ -40,6 +41,8 @@ async def execute(options: ScanOptions) -> ScanReport:
             report.warnings.append(
                 "GitHub lookup unavailable; unmatched findings are not confirmed new upstream."
             )
+    # After Tier 2, so curated vectors and local evidence outrank estimates.
+    await asyncio.to_thread(run_verification, report)
     report.recount()
     # Defense in depth: API/CLI return exactly the sanitized persisted contract.
     clean = ScanReport.model_validate(redact_data(report.model_dump()))

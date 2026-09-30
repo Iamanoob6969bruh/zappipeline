@@ -48,6 +48,12 @@ _TEST_FILE = re.compile(r"\.(?:test|spec|mock|stories|d)\.[cm]?[jt]sx?$", re.I)
 _DOC_SUFFIXES = {".md", ".mdx", ".rst", ".adoc", ".txt"}
 _SAMPLE_DIRS = {"docs", "doc", "examples", "example", "fixtures", "generated"}
 _SAMPLE_NAME = re.compile(r"(?:^|[._-])(?:example|sample|dummy|generated)(?:[._-]|$)", re.I)
+# Saved scanner output inside the target: it repeats other findings, not new code.
+_SCAN_ARTIFACT = re.compile(
+    r"^(?:(?:gitleaks|semgrep|trivy|zap)[\w.-]*\.(?:json|sarif)"
+    r"|(?:scan|assessment)-[\w.-]+\.(?:json|md|html))$",
+    re.I,
+)
 
 
 # Hygiene rules: useful context, but rarely a vulnerability on their own.
@@ -159,8 +165,19 @@ def check_ast_reachability(
     if not finding.file_path:
         return False, ""
     relative = Path(finding.file_path)
+    untracked = tracked is not None and finding.file_path not in tracked
+    if untracked and _SCAN_ARTIFACT.match(relative.name):
+        return True, (
+            "Policy: saved scanner output (not project code) that repeats other findings; "
+            "restore to review"
+        )
     # Dependency/configuration warnings matter even in tests.
     if finding.tool_name == "Trivy":
+        if untracked and finding.code_snippet == "[REDACTED_SECRET_EVIDENCE]":
+            return True, (
+                "Policy: secret pattern in a file not tracked by git, so it is not a "
+                "repository leak; restore to review"
+            )
         return False, ""
     if finding.tool_name == "Gitleaks":
         if any(part in _THIRD_PARTY_DIRS for part in relative.parts[:-1]):
@@ -168,7 +185,7 @@ def check_ast_reachability(
                 "Policy: credential pattern in installed third-party dependency code, "
                 "not this project's secret; restore to review"
             )
-        if tracked is not None and finding.file_path not in tracked:
+        if untracked:
             return True, (
                 "Policy: file is not tracked by git (a local-only file such as .env or a "
                 "saved report), so it is not a repository leak; restore to review"
@@ -223,9 +240,7 @@ def run_tier1(report: ScanReport, prior_hashes: set[str] | None = None) -> ScanR
         report.warnings.append(
             "Tree-sitter unavailable: only path filtering was applied; no AST conclusions made."
         )
-    tracked = None
-    if any(f.tool_name == "Gitleaks" for f in report.findings):
-        tracked = tracked_files(root)
+    tracked = tracked_files(root) if report.findings else None
     by_location = defaultdict(list)
     for finding in report.findings:
         filtered, reason = check_ast_reachability(finding, root, cache, tracked)

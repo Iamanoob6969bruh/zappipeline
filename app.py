@@ -131,6 +131,17 @@ index = indices[0] if indices else 0
 finding = findings[min(index, len(findings) - 1)]
 st.subheader(finding.rule_id)
 st.write(finding.raw_description)
+if finding.verification:
+    if finding.verification.startswith("CONFIRMED"):
+        st.success(finding.verification)
+    else:
+        st.warning(finding.verification)
+if finding.cvss_score is not None:
+    st.caption(
+        f"CVSS 3.1: {finding.cvss_score}"
+        + (f" · {finding.cvss_vector}" if finding.cvss_vector else "")
+        + (f" · source: {finding.cvss_source}" if finding.cvss_source else "")
+    )
 if finding.filter_reason:
     st.info(finding.filter_reason)
 if finding.code_snippet:
